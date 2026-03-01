@@ -1,0 +1,121 @@
+{
+  "info": {
+    "name": "Article Microservice",
+    "description": "Postman collection for the Article Microservice API (Test Backend - Sharing Vision 2023)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Create Article",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/article/", "host": ["{{base_url}}"], "path": ["article", ""] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Judul artikel minimal dua puluh karakter\",\n  \"content\": \"Konten artikel ini harus lebih dari dua ratus karakter untuk memenuhi validasi. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi.\",\n  \"category\": \"Teknologi\",\n  \"status\": \"publish\"\n}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "2. Get All Articles (paginated)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/article/10/0",
+          "host": ["{{base_url}}"],
+          "path": ["article", "10", "0"],
+          "description": "limit=10, offset=0 — change values for different pages"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "3. Get Article by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/article/1",
+          "host": ["{{base_url}}"],
+          "path": ["article", "1"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "4. Update Article by ID",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": {
+          "raw": "{{base_url}}/article/1",
+          "host": ["{{base_url}}"],
+          "path": ["article", "1"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Judul artikel yang sudah diperbarui minimal dua puluh karakter\",\n  \"content\": \"Konten artikel yang sudah diperbarui dan harus lebih dari dua ratus karakter untuk memenuhi validasi. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi.\",\n  \"category\": \"Pembaruan\",\n  \"status\": \"draft\"\n}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "5. Delete Article by ID",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/article/1",
+          "host": ["{{base_url}}"],
+          "path": ["article", "1"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+      },
+      "response": []
+    },
+    {
+      "name": "Validation Error - Title too short",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/article/", "host": ["{{base_url}}"], "path": ["article", ""] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Short title\",\n  \"content\": \"Konten artikel ini harus lebih dari dua ratus karakter untuk memenuhi validasi. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi.\",\n  \"category\": \"Teknologi\",\n  \"status\": \"publish\"\n}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Validation Error - Invalid status",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/article/", "host": ["{{base_url}}"], "path": ["article", ""] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Judul artikel minimal dua puluh karakter\",\n  \"content\": \"Konten artikel ini harus lebih dari dua ratus karakter untuk memenuhi validasi. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi.\",\n  \"category\": \"Teknologi\",\n  \"status\": \"invalid_status\"\n}"
+        }
+      },
+      "response": []
+    }
+  ]
+}
