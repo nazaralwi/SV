@@ -1,10 +1,11 @@
 """
 Article Microservice
-POST /article/                  - Create a new article
-GET  /article/<limit>/<offset>  - Get paginated list of articles
-GET  /article/<id>              - Get single article by ID
-PUT  /article/<id>              - Update article by ID
-DELETE /article/<id>            - Delete article by ID
+POST   /article/               - Buat artikel baru
+GET    /article/<limit>/<offset> - List artikel dengan paging
+GET    /article/<id>           - Ambil artikel by ID
+PUT    /article/<id>           - Update artikel
+DELETE /article/<id>           - Hapus artikel
+GET    /health                 - Health check
 """
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -13,16 +14,17 @@ import mysql.connector
 import os
 
 app = Flask(__name__)
-CORS(app)  # Allow browser frontends to call this API
+CORS(app)
 
-# --- Database Configuration ---
-# Priority:
-#   1. MYSQL_URL  — Railway connection string (paling diutamakan)
-#   2. MYSQLHOST, MYSQLPORT, MYSQLUSER, MYSQLPASSWORD, MYSQL_DATABASE — Railway individual vars
-#   3. DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME — local fallback
+# ─── Database Configuration ───────────────────────────────────────────────────
+# Priority (urutan cek):
+#   1. MYSQL_URL / DATABASE_URL    — Railway / connection string
+#   2. MYSQLHOST, MYSQLPORT, ...   — Railway individual vars
+#   3. DB_HOST, DB_PORT, ...       — file .env / lokal
+#   4. Hardcoded localhost         — fallback terakhir (lokal tanpa .env)
 
 def _get_db_config() -> dict:
-    # Mode 1: MYSQL_URL connection string
+    # Mode 1: connection string
     url = os.getenv("MYSQL_URL") or os.getenv("DATABASE_URL")
     if url:
         p = urlparse(url)
@@ -34,20 +36,19 @@ def _get_db_config() -> dict:
             "database": p.path.lstrip("/"),
         }
 
-    # Mode 2: Railway individual vars (MYSQLHOST, MYSQLPORT, dll)
-    # Mode 3: Local individual vars (DB_HOST, DB_PORT, dll)
+    # Mode 2 & 3: individual env vars dengan fallback localhost
     raw_port = (
         os.getenv("MYSQLPORT") or
         os.getenv("DB_PORT") or
-        ""
+        "3306"
     ).strip()
 
     return {
-        "host":     os.getenv("MYSQLHOST")     or os.getenv("DB_HOST",     "localhost"),
-        "port":     int(raw_port) if raw_port else 3306,
-        "user":     os.getenv("MYSQLUSER")     or os.getenv("DB_USER",     "root"),
-        "password": os.getenv("MYSQLPASSWORD") or os.getenv("DB_PASSWORD", ""),
-        "database": os.getenv("MYSQL_DATABASE") or os.getenv("DB_NAME",   "article"),
+        "host":     os.getenv("MYSQLHOST")      or os.getenv("DB_HOST",     "localhost"),
+        "port":     int(raw_port),
+        "user":     os.getenv("MYSQLUSER")      or os.getenv("DB_USER",     "root"),
+        "password": os.getenv("MYSQLPASSWORD")  or os.getenv("DB_PASSWORD", ""),
+        "database": os.getenv("MYSQL_DATABASE") or os.getenv("DB_NAME",     "article"),
     }
 
 DB_CONFIG = _get_db_config()
@@ -59,11 +60,10 @@ def get_connection():
     return mysql.connector.connect(**DB_CONFIG)
 
 
-# ─── Validation ────────────────────────────────────────────────────────────────
+# ─── Validation ───────────────────────────────────────────────────────────────
 
-def validate_article(data: dict) -> list[str]:
+def validate_article(data: dict) -> list:
     errors = []
-
     title    = data.get("title", "")
     content  = data.get("content", "")
     category = data.get("category", "")
@@ -87,7 +87,7 @@ def validate_article(data: dict) -> list[str]:
     if not status:
         errors.append("status is required.")
     elif status.lower() not in VALID_STATUSES:
-        errors.append(f"status must be one of: {', '.join(VALID_STATUSES)}.")
+        errors.append("status must be one of: publish, draft, thrash.")
 
     return errors
 
@@ -104,11 +104,11 @@ def row_to_dict(row) -> dict:
     }
 
 
-# ─── Routes ────────────────────────────────────────────────────────────────────
+# ─── Routes ───────────────────────────────────────────────────────────────────
 
 @app.route("/article/", methods=["POST"])
 def create_article():
-    data = request.get_json(silent=True) or {}
+    data   = request.get_json(silent=True) or {}
     errors = validate_article(data)
     if errors:
         return jsonify({"errors": errors}), 400
@@ -121,15 +121,14 @@ def create_article():
             (data["title"], data["content"], data["category"], data["status"].lower()),
         )
         conn.commit()
-        new_id = cursor.lastrowid
-        return jsonify({"id": new_id, "message": "Article created successfully."}), 201
+        return jsonify({"id": cursor.lastrowid, "message": "Article created successfully."}), 201
     finally:
         cursor.close()
         conn.close()
 
 
 @app.route("/article/<int:limit>/<int:offset>", methods=["GET"])
-def list_articles(limit: int, offset: int):
+def list_articles(limit, offset):
     conn   = get_connection()
     cursor = conn.cursor()
     try:
@@ -138,15 +137,14 @@ def list_articles(limit: int, offset: int):
             "FROM posts ORDER BY id DESC LIMIT %s OFFSET %s",
             (limit, offset),
         )
-        rows = cursor.fetchall()
-        return jsonify([row_to_dict(r) for r in rows]), 200
+        return jsonify([row_to_dict(r) for r in cursor.fetchall()]), 200
     finally:
         cursor.close()
         conn.close()
 
 
 @app.route("/article/<int:article_id>", methods=["GET"])
-def get_article(article_id: int):
+def get_article(article_id):
     conn   = get_connection()
     cursor = conn.cursor()
     try:
@@ -164,10 +162,9 @@ def get_article(article_id: int):
         conn.close()
 
 
-@app.route("/article/<int:article_id>", methods=["PUT", "PATCH", "POST"])
-def update_article(article_id: int):
-    # Allow POST with ?_method=PUT workaround if needed
-    data = request.get_json(silent=True) or {}
+@app.route("/article/<int:article_id>", methods=["PUT", "PATCH"])
+def update_article(article_id):
+    data   = request.get_json(silent=True) or {}
     errors = validate_article(data)
     if errors:
         return jsonify({"errors": errors}), 400
@@ -191,7 +188,7 @@ def update_article(article_id: int):
 
 
 @app.route("/article/<int:article_id>", methods=["DELETE"])
-def delete_article(article_id: int):
+def delete_article(article_id):
     conn   = get_connection()
     cursor = conn.cursor()
     try:
@@ -207,14 +204,14 @@ def delete_article(article_id: int):
         conn.close()
 
 
-# ─── Health Check ──────────────────────────────────────────────────────────────
-
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"}), 200
 
 
-# ─── Entry Point ───────────────────────────────────────────────────────────────
+# ─── Entry Point ──────────────────────────────────────────────────────────────
+# Dipakai saat run lokal: python app.py
+# PythonAnywhere menggunakan wsgi.py, bukan __main__
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8080)), debug=False)

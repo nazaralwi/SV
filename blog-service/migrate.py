@@ -1,6 +1,9 @@
 """
 Database Migration Script
-Creates the 'posts' table in the 'article' database.
+Membuat database 'article' dan tabel 'posts'.
+
+Cara pakai:
+  python migrate.py
 """
 import mysql.connector
 from urllib.parse import urlparse
@@ -8,7 +11,14 @@ import os
 
 
 def _get_db_config():
-    # Mode 1: MYSQL_URL connection string (Railway)
+    """
+    Baca konfigurasi DB dari environment variables.
+    Priority:
+      1. MYSQL_URL / DATABASE_URL  (Railway / connection string)
+      2. MYSQLHOST, MYSQLPORT, ... (Railway individual vars)
+      3. DB_HOST, DB_PORT, ...     (file .env / PythonAnywhere wsgi.py)
+      4. localhost:3306            (fallback lokal)
+    """
     url = os.getenv("MYSQL_URL") or os.getenv("DATABASE_URL")
     if url:
         p = urlparse(url)
@@ -19,12 +29,15 @@ def _get_db_config():
             "password": p.password or "",
         }, p.path.lstrip("/")
 
-    # Mode 2: Railway individual vars
-    # Mode 3: Local fallback
-    raw_port = (os.getenv("MYSQLPORT") or os.getenv("DB_PORT") or "").strip()
+    raw_port = (
+        os.getenv("MYSQLPORT") or
+        os.getenv("DB_PORT") or
+        "3306"
+    ).strip()
+
     config = {
         "host":     os.getenv("MYSQLHOST")     or os.getenv("DB_HOST",     "localhost"),
-        "port":     int(raw_port) if raw_port else 3306,
+        "port":     int(raw_port),
         "user":     os.getenv("MYSQLUSER")     or os.getenv("DB_USER",     "root"),
         "password": os.getenv("MYSQLPASSWORD") or os.getenv("DB_PASSWORD", ""),
     }
@@ -49,15 +62,20 @@ def run_migration():
     config, db_name = _get_db_config()
 
     print(f"⏳ Connecting to {config['host']}:{config['port']} as {config['user']} ...")
+
+    # Koneksi awal tanpa database untuk bisa CREATE DATABASE
     conn   = mysql.connector.connect(**config)
     cursor = conn.cursor()
 
-    cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
+    cursor.execute(
+        f"CREATE DATABASE IF NOT EXISTS `{db_name}` "
+        f"CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    )
     cursor.execute(f"USE `{db_name}`;")
     cursor.execute(CREATE_TABLE_SQL)
     conn.commit()
 
-    print(f"✅ Migration complete. Database '{db_name}' and table 'posts' are ready.")
+    print(f"✅ Migration selesai. Database '{db_name}' dan tabel 'posts' siap.")
     cursor.close()
     conn.close()
 
