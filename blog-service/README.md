@@ -58,7 +58,8 @@ blog-service/
 
 ### 2. Clone / download project
 ```bash
-cd ~/projects
+git clone https://github.com/nazaralwi/SV.git
+cd SV
 # letakkan semua file di folder blog-service
 ```
 
@@ -115,7 +116,7 @@ Server berjalan di: `http://localhost:8080`
 
 ---
 
-## 🌐 Deploy ke PythonAnywhere (Gratis Selamanya)
+## 🌐 Deploy ke PythonAnywhere
 
 ### 1. Daftar akun
 Buka https://www.pythonanywhere.com → klik **Start running Python online** → pilih **Create a Beginner account** (gratis).
