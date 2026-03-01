@@ -8,21 +8,49 @@ DELETE /article/<id>            - Delete article by ID
 """
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from urllib.parse import urlparse
 import mysql.connector
 import os
 
 app = Flask(__name__)
 CORS(app)  # Allow browser frontends to call this API
 
-# ─── Database Configuration ────────────────────────────────────────────────────
+# --- Database Configuration ---
+# Priority:
+#   1. MYSQL_URL  — Railway connection string (paling diutamakan)
+#   2. MYSQLHOST, MYSQLPORT, MYSQLUSER, MYSQLPASSWORD, MYSQL_DATABASE — Railway individual vars
+#   3. DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME — local fallback
 
-DB_CONFIG = {
-    "host":     os.getenv("DB_HOST", "localhost"),
-    "port":     int(os.getenv("DB_PORT", 3306)),
-    "user":     os.getenv("DB_USER", "root"),
-    "password": os.getenv("DB_PASSWORD", ""),
-    "database": os.getenv("DB_NAME", "article"),
-}
+def _get_db_config() -> dict:
+    # Mode 1: MYSQL_URL connection string
+    url = os.getenv("MYSQL_URL") or os.getenv("DATABASE_URL")
+    if url:
+        p = urlparse(url)
+        return {
+            "host":     p.hostname,
+            "port":     p.port or 3306,
+            "user":     p.username,
+            "password": p.password or "",
+            "database": p.path.lstrip("/"),
+        }
+
+    # Mode 2: Railway individual vars (MYSQLHOST, MYSQLPORT, dll)
+    # Mode 3: Local individual vars (DB_HOST, DB_PORT, dll)
+    raw_port = (
+        os.getenv("MYSQLPORT") or
+        os.getenv("DB_PORT") or
+        ""
+    ).strip()
+
+    return {
+        "host":     os.getenv("MYSQLHOST")     or os.getenv("DB_HOST",     "localhost"),
+        "port":     int(raw_port) if raw_port else 3306,
+        "user":     os.getenv("MYSQLUSER")     or os.getenv("DB_USER",     "root"),
+        "password": os.getenv("MYSQLPASSWORD") or os.getenv("DB_PASSWORD", ""),
+        "database": os.getenv("MYSQL_DATABASE") or os.getenv("DB_NAME",   "article"),
+    }
+
+DB_CONFIG = _get_db_config()
 
 VALID_STATUSES = {"publish", "draft", "thrash"}
 

@@ -3,16 +3,34 @@ Database Migration Script
 Creates the 'posts' table in the 'article' database.
 """
 import mysql.connector
+from urllib.parse import urlparse
 import os
 
-DB_CONFIG = {
-    "host": os.getenv("DB_HOST", "localhost"),
-    "port": int(os.getenv("DB_PORT", 3306)),
-    "user": os.getenv("DB_USER", "root"),
-    "password": os.getenv("DB_PASSWORD", ""),
-}
 
-DB_NAME = os.getenv("DB_NAME", "article")
+def _get_db_config():
+    # Mode 1: MYSQL_URL connection string (Railway)
+    url = os.getenv("MYSQL_URL") or os.getenv("DATABASE_URL")
+    if url:
+        p = urlparse(url)
+        return {
+            "host":     p.hostname,
+            "port":     p.port or 3306,
+            "user":     p.username,
+            "password": p.password or "",
+        }, p.path.lstrip("/")
+
+    # Mode 2: Railway individual vars
+    # Mode 3: Local fallback
+    raw_port = (os.getenv("MYSQLPORT") or os.getenv("DB_PORT") or "").strip()
+    config = {
+        "host":     os.getenv("MYSQLHOST")     or os.getenv("DB_HOST",     "localhost"),
+        "port":     int(raw_port) if raw_port else 3306,
+        "user":     os.getenv("MYSQLUSER")     or os.getenv("DB_USER",     "root"),
+        "password": os.getenv("MYSQLPASSWORD") or os.getenv("DB_PASSWORD", ""),
+    }
+    db_name = os.getenv("MYSQL_DATABASE") or os.getenv("DB_NAME", "article")
+    return config, db_name
+
 
 CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS posts (
@@ -28,18 +46,18 @@ CREATE TABLE IF NOT EXISTS posts (
 
 
 def run_migration():
-    conn = mysql.connector.connect(**DB_CONFIG)
+    config, db_name = _get_db_config()
+
+    print(f"⏳ Connecting to {config['host']}:{config['port']} as {config['user']} ...")
+    conn   = mysql.connector.connect(**config)
     cursor = conn.cursor()
 
-    # Create database if not exists
-    cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{DB_NAME}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
-    cursor.execute(f"USE `{DB_NAME}`;")
-
-    # Create table
+    cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
+    cursor.execute(f"USE `{db_name}`;")
     cursor.execute(CREATE_TABLE_SQL)
     conn.commit()
 
-    print(f"✅ Migration complete. Database '{DB_NAME}' and table 'posts' are ready.")
+    print(f"✅ Migration complete. Database '{db_name}' and table 'posts' are ready.")
     cursor.close()
     conn.close()
 
